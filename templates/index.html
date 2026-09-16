@@ -39,8 +39,9 @@
 
     /* Window/title bar */
     .titlebar {
-      background: #fff;
-      border-bottom: 1px solid var(--line);
+      background: #107c41;
+      border-bottom: 1px solid #0b6a37;
+      color: #fff;
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
@@ -57,7 +58,7 @@
       width: 14px;
       height: 14px;
       border-radius: 2px;
-      background: #107c41;
+      background: #fff;
       display: inline-block;
     }
     .book-title {
@@ -66,6 +67,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 460px;
+      color: #fff;
     }
     .search-wrap {
       display: flex;
@@ -74,12 +76,12 @@
     }
     .search {
       width: min(560px, 100%);
-      border: 1px solid var(--line);
+      border: 1px solid #2f8f5d;
       border-radius: 4px;
       height: 28px;
       padding: 0 10px;
-      color: var(--muted);
-      background: #fff;
+      color: #e9f5ee;
+      background: rgba(255,255,255,0.08);
       display: flex;
       align-items: center;
     }
@@ -89,16 +91,17 @@
       gap: 8px;
     }
     .chip {
-      border: 1px solid var(--line);
+      border: 1px solid #2f8f5d;
       padding: 4px 8px;
       border-radius: 4px;
-      background: #fff;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
       font-size: 12px;
     }
     .share-btn {
-      background: #107c41;
-      color: #fff;
-      border: 1px solid #107c41;
+      background: #fff;
+      color: #107c41;
+      border: 1px solid #fff;
       border-radius: 4px;
       padding: 5px 10px;
       font-weight: 600;
@@ -120,11 +123,11 @@
       border-bottom: none;
       border-radius: 4px 4px 0 0;
       padding: 8px 10px;
-      color: var(--muted);
+      color: #605e5c;
       font-size: 12px;
     }
     .rtab.active {
-      color: var(--text);
+      color: #107c41;
       background: #fff;
       border-color: var(--line);
       font-weight: 600;
@@ -302,9 +305,10 @@
     }
     .sheet-tab.active {
       background: #fff;
-      color: var(--accent);
-      border-color: var(--accent);
+      color: #107c41;
+      border-color: #107c41;
       font-weight: 600;
+      box-shadow: inset 0 -2px 0 #107c41;
     }
 
     /* Status bar */
@@ -438,6 +442,25 @@
     function addr(r, c) { return `${colLabel(c)}${r + 1}`; }
     function activeSheet() { return wb.sheets[wb.active_sheet]; }
 
+    function parseAddr(a) {
+      const m = /^([A-Z]+)([1-9][0-9]*)$/.exec(a.toUpperCase());
+      if (!m) return null;
+      const letters = m[1];
+      const row = parseInt(m[2], 10) - 1;
+      let col = 0;
+      for (let i = 0; i < letters.length; i++) {
+        col = col * 26 + (letters.charCodeAt(i) - 64);
+      }
+      col -= 1;
+      return { row, col };
+    }
+
+    function ensureSize(minRows, minCols) {
+      const s = activeSheet();
+      if (s.rows < minRows) s.rows = minRows;
+      if (s.cols < minCols) s.cols = minCols;
+    }
+
     function ensureCell(a) {
       const s = activeSheet();
       if (!s.cells[a]) s.cells[a] = { raw: '', value: '' };
@@ -504,6 +527,7 @@
             ensureCell(a).raw = e.target.value;
             if (selectedAddr === a) formulaInput.value = e.target.value;
           };
+          input.addEventListener('paste', handleCellPaste);
           td.appendChild(input);
           tr.appendChild(td);
         }
@@ -514,6 +538,42 @@
       grid.innerHTML = '';
       grid.appendChild(thead);
       grid.appendChild(tbody);
+    }
+
+    function applyMatrixPaste(startAddr, text) {
+      const p = parseAddr(startAddr);
+      if (!p) return;
+
+      const rows = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter((line, idx, arr) => !(idx === arr.length - 1 && line === ''));
+      const matrix = rows.map(r => r.split('\t'));
+
+      const neededRows = p.row + matrix.length;
+      const neededCols = p.col + Math.max(...matrix.map(r => r.length), 1);
+      ensureSize(neededRows, neededCols);
+
+      const s = activeSheet();
+      for (let r = 0; r < matrix.length; r++) {
+        for (let c = 0; c < matrix[r].length; c++) {
+          const v = matrix[r][c];
+          const a = addr(p.row + r, p.col + c);
+          if (v !== '') s.cells[a] = { raw: v, value: '' };
+          else delete s.cells[a];
+        }
+      }
+    }
+
+    function handleCellPaste(e) {
+      const text = e.clipboardData?.getData('text/plain') || '';
+      if (!text) return;
+
+      if (text.includes('\t') || text.includes('\n') || text.includes('\r')) {
+        e.preventDefault();
+        const start = e.target.dataset.addr;
+        applyMatrixPaste(start, text);
+        selectedAddr = start;
+        render();
+        setStatus('Pasted range');
+      }
     }
 
     function selectCell(a) {
