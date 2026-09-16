@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sheet</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    button, input[type="file"] { padding: 6px 10px; }
+    #status { margin-left: 8px; color: #555; }
+    .grid-wrap { overflow: auto; border: 1px solid #ddd; max-height: 75vh; }
+    table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    th, td { border: 1px solid #ddd; min-width: 100px; height: 28px; }
+    th { background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
+    td.row-header { background: #f5f5f5; text-align: right; padding-right: 8px; position: sticky; left: 0; z-index: 1; }
+    th.corner { left: 0; z-index: 3; position: sticky; }
+    td.cell { padding: 0; }
+    td.cell input { width: 100%; border: none; padding: 6px; box-sizing: border-box; height: 100%; }
+    td.cell input:focus { outline: 2px solid #4285f4; }
+  </style>
+</head>
+<body>
+  <h2>Sheet</h2>
+  <div class="toolbar">
+    <button id="addRow">+ Row</button>
+    <button id="addCol">+ Column</button>
+    <button id="saveBtn">Save</button>
+    <button id="exportBtn">Export CSV</button>
+    <label>Import CSV <input id="importFile" type="file" accept=".csv" /></label>
+    <a href="/view" target="_blank">Open read-only view</a>
+    <span id="status">Ready</span>
+  </div>
+  <div class="grid-wrap">
+    <table id="grid"></table>
+  </div>
+
+  <script>
+    let model = { rows: 20, cols: 10, cells: {} };
+
+    const grid = document.getElementById('grid');
+    const statusEl = document.getElementById('status');
+
+    function colLabel(idx) {
+      let s = '';
+      idx += 1;
+      while (idx > 0) {
+        const rem = (idx - 1) % 26;
+        s = String.fromCharCode(65 + rem) + s;
+        idx = Math.floor((idx - 1) / 26);
+      }
+      return s;
+    }
+
+    function addr(r, c) { return `${colLabel(c)}${r+1}`; }
+
+    async function loadSheet() {
+      const r = await fetch('/api/sheet');
+      model = await r.json();
+      render();
+      setStatus('Loaded');
+    }
+
+    function render() {
+      const thead = document.createElement('thead');
+      const hr = document.createElement('tr');
+      const corner = document.createElement('th');
+      corner.className = 'corner';
+      corner.textContent = '';
+      hr.appendChild(corner);
+      for (let c = 0; c < model.cols; c++) {
+        const th = document.createElement('th');
+        th.textContent = colLabel(c);
+        hr.appendChild(th);
+      }
+      thead.appendChild(hr);
+
+      const tbody = document.createElement('tbody');
+      for (let r = 0; r < model.rows; r++) {
+        const tr = document.createElement('tr');
+        const rh = document.createElement('td');
+        rh.className = 'row-header';
+        rh.textContent = (r + 1).toString();
+        tr.appendChild(rh);
+
+        for (let c = 0; c < model.cols; c++) {
+          const a = addr(r, c);
+          const td = document.createElement('td');
+          td.className = 'cell';
+          const input = document.createElement('input');
+          const cell = model.cells[a] || { raw: '', value: '' };
+          input.value = cell.raw;
+          input.dataset.addr = a;
+          input.title = cell.value !== undefined ? String(cell.value) : '';
+          input.addEventListener('change', (e) => {
+            const key = e.target.dataset.addr;
+            if (!model.cells[key]) model.cells[key] = { raw: '', value: '' };
+            model.cells[key].raw = e.target.value;
+          });
+          td.appendChild(input);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      grid.innerHTML = '';
+      grid.appendChild(thead);
+      grid.appendChild(tbody);
+    }
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    async function save() {
+      setStatus('Saving...');
+      const r = await fetch('/api/sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(model)
+      });
+      if (!r.ok) { setStatus('Save failed'); return; }
+      model = await r.json();
+      render();
+      setStatus('Saved');
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', save);
+    document.getElementById('addRow').addEventListener('click', () => { model.rows += 1; render(); });
+    document.getElementById('addCol').addEventListener('click', () => { model.cols += 1; render(); });
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      window.location.href = '/api/export.csv';
+    });
+
+    document.getElementById('importFile').addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const form = new FormData();
+      form.append('file', f);
+      setStatus('Importing...');
+      const r = await fetch('/api/import.csv', { method: 'POST', body: form });
+      if (!r.ok) { setStatus('Import failed'); return; }
+      model = await r.json();
+      render();
+      setStatus('Imported');
+    });
+
+    loadSheet();
+  </script>
+</body>
+</html>
