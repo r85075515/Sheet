@@ -5,41 +5,187 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sheet</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-    button, input[type="file"] { padding: 6px 10px; }
-    #status { margin-left: 8px; color: #555; }
-    .grid-wrap { overflow: auto; border: 1px solid #ddd; max-height: 75vh; }
+    :root {
+      --bg: #f3f2f1;
+      --panel: #ffffff;
+      --border: #d1d1d1;
+      --text: #242424;
+      --muted: #616161;
+      --accent: #0f6cbd;
+      --accent-weak: #deecf9;
+    }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Arial, sans-serif; }
+    .topbar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      gap: 14px;
+      font-size: 13px;
+    }
+    .brand { font-weight: 600; }
+    .menu { display: flex; gap: 10px; color: var(--muted); }
+    .menu span { cursor: default; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    button, input[type="file"] {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #status { margin-left: 8px; color: var(--muted); font-size: 12px; }
+    .formula-bar {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    #nameBox, #formulaInput {
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0 8px;
+      font-size: 13px;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    #nameBox { width: 100%; }
+    .sheet-wrap {
+      margin: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      height: calc(100vh - 180px);
+      overflow: auto;
+    }
     table { border-collapse: collapse; width: max-content; min-width: 100%; }
-    th, td { border: 1px solid #ddd; min-width: 100px; height: 28px; }
-    th { background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
-    td.row-header { background: #f5f5f5; text-align: right; padding-right: 8px; position: sticky; left: 0; z-index: 1; }
-    th.corner { left: 0; z-index: 3; position: sticky; }
-    td.cell { padding: 0; }
-    td.cell input { width: 100%; border: none; padding: 6px; box-sizing: border-box; height: 100%; }
-    td.cell input:focus { outline: 2px solid #4285f4; }
+    th, td {
+      border: 1px solid #e6e6e6;
+      min-width: 110px;
+      height: 28px;
+      box-sizing: border-box;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #faf9f8;
+      z-index: 3;
+      text-align: center;
+      font-size: 12px;
+      color: #3b3a39;
+      font-weight: 600;
+    }
+    th.corner {
+      left: 0;
+      z-index: 4;
+      min-width: 44px;
+      width: 44px;
+    }
+    td.row-h {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      min-width: 44px;
+      width: 44px;
+      text-align: right;
+      padding-right: 8px;
+      background: #faf9f8;
+      color: #3b3a39;
+      font-size: 12px;
+      user-select: none;
+    }
+    td.cell { padding: 0; background: #fff; }
+    td.cell input {
+      width: 100%;
+      height: 100%;
+      border: none;
+      padding: 0 8px;
+      box-sizing: border-box;
+      font-size: 13px;
+      background: transparent;
+    }
+    td.cell input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      background: var(--accent-weak);
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 8px 10px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #f8f8f8;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #fff;
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
-  <h2>Sheet</h2>
+  <div class="topbar">
+    <div class="brand">Sheet</div>
+    <div class="menu"><span>File</span><span>Home</span><span>Insert</span><span>Data</span><span>Review</span><span>View</span></div>
+  </div>
+
   <div class="toolbar">
     <button id="addRow">+ Row</button>
-    <button id="addCol">+ Column</button>
-    <button id="saveBtn">Save</button>
+    <button id="addCol">+ Col</button>
+    <button id="addSheet">+ Sheet</button>
+    <button id="renameSheet">Rename Sheet</button>
+    <button id="syncBtn">Sync</button>
+    <button class="primary" id="saveBtn">Save</button>
     <button id="exportBtn">Export CSV</button>
     <label>Import CSV <input id="importFile" type="file" accept=".csv" /></label>
-    <a href="/view" target="_blank">Open read-only view</a>
+    <a href="/view" target="_blank">Read-only view</a>
     <span id="status">Ready</span>
   </div>
-  <div class="grid-wrap">
-    <table id="grid"></table>
+
+  <div class="formula-bar">
+    <input id="nameBox" readonly value="A1" />
+    <input id="formulaInput" placeholder="Formula bar (edit selected cell and press Enter)" />
   </div>
 
+  <div class="sheet-wrap"><table id="grid"></table></div>
+  <div class="tabs" id="tabs"></div>
+
   <script>
-    let model = { rows: 20, cols: 10, cells: {} };
+    let wb = { version: 2, sheet_order: ['Sheet1'], active_sheet: 'Sheet1', sheets: { Sheet1: { rows: 20, cols: 10, cells: {} } } };
+    let selectedAddr = 'A1';
 
     const grid = document.getElementById('grid');
+    const tabs = document.getElementById('tabs');
     const statusEl = document.getElementById('status');
+    const formulaInput = document.getElementById('formulaInput');
+    const nameBox = document.getElementById('nameBox');
+
+    function setStatus(msg) { statusEl.textContent = msg; }
 
     function colLabel(idx) {
       let s = '';
@@ -52,23 +198,41 @@
       return s;
     }
 
-    function addr(r, c) { return `${colLabel(c)}${r+1}`; }
+    function addr(r, c) { return `${colLabel(c)}${r + 1}`; }
 
-    async function loadSheet() {
-      const r = await fetch('/api/sheet');
-      model = await r.json();
-      render();
-      setStatus('Loaded');
+    function activeSheet() {
+      return wb.sheets[wb.active_sheet];
     }
 
-    function render() {
+    function ensureCell(a) {
+      const s = activeSheet();
+      if (!s.cells[a]) s.cells[a] = { raw: '', value: '' };
+      return s.cells[a];
+    }
+
+    function renderTabs() {
+      tabs.innerHTML = '';
+      wb.sheet_order.forEach(name => {
+        const t = document.createElement('div');
+        t.className = 'tab' + (name === wb.active_sheet ? ' active' : '');
+        t.textContent = name;
+        t.onclick = () => {
+          wb.active_sheet = name;
+          selectedAddr = 'A1';
+          render();
+        };
+        tabs.appendChild(t);
+      });
+    }
+
+    function renderGrid() {
+      const s = activeSheet();
       const thead = document.createElement('thead');
       const hr = document.createElement('tr');
       const corner = document.createElement('th');
       corner.className = 'corner';
-      corner.textContent = '';
       hr.appendChild(corner);
-      for (let c = 0; c < model.cols; c++) {
+      for (let c = 0; c < s.cols; c++) {
         const th = document.createElement('th');
         th.textContent = colLabel(c);
         hr.appendChild(th);
@@ -76,27 +240,27 @@
       thead.appendChild(hr);
 
       const tbody = document.createElement('tbody');
-      for (let r = 0; r < model.rows; r++) {
+      for (let r = 0; r < s.rows; r++) {
         const tr = document.createElement('tr');
         const rh = document.createElement('td');
-        rh.className = 'row-header';
-        rh.textContent = (r + 1).toString();
+        rh.className = 'row-h';
+        rh.textContent = String(r + 1);
         tr.appendChild(rh);
 
-        for (let c = 0; c < model.cols; c++) {
+        for (let c = 0; c < s.cols; c++) {
           const a = addr(r, c);
           const td = document.createElement('td');
           td.className = 'cell';
           const input = document.createElement('input');
-          const cell = model.cells[a] || { raw: '', value: '' };
+          const cell = s.cells[a] || { raw: '', value: '' };
           input.value = cell.raw;
           input.dataset.addr = a;
-          input.title = cell.value !== undefined ? String(cell.value) : '';
-          input.addEventListener('change', (e) => {
-            const key = e.target.dataset.addr;
-            if (!model.cells[key]) model.cells[key] = { raw: '', value: '' };
-            model.cells[key].raw = e.target.value;
-          });
+          input.title = (cell.value ?? '').toString();
+          input.onfocus = () => selectCell(a);
+          input.onchange = (e) => {
+            ensureCell(a).raw = e.target.value;
+            if (selectedAddr === a) formulaInput.value = e.target.value;
+          };
           td.appendChild(input);
           tr.appendChild(td);
         }
@@ -108,43 +272,106 @@
       grid.appendChild(tbody);
     }
 
-    function setStatus(msg) { statusEl.textContent = msg; }
+    function selectCell(a) {
+      selectedAddr = a;
+      nameBox.value = a;
+      formulaInput.value = (activeSheet().cells[a]?.raw) || '';
+    }
 
-    async function save() {
+    function render() {
+      renderTabs();
+      renderGrid();
+      selectCell(selectedAddr);
+    }
+
+    async function loadWorkbook() {
+      const r = await fetch('/api/sheet');
+      wb = await r.json();
+      if (!wb.active_sheet) wb.active_sheet = wb.sheet_order[0];
+      if (!selectedAddr) selectedAddr = 'A1';
+      render();
+      setStatus('Loaded');
+    }
+
+    async function saveWorkbook() {
       setStatus('Saving...');
       const r = await fetch('/api/sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(model)
+        body: JSON.stringify(wb)
       });
-      if (!r.ok) { setStatus('Save failed'); return; }
-      model = await r.json();
+      const data = await r.json();
+      wb = data;
       render();
-      setStatus('Saved');
+      if (data.git_sync?.ok) setStatus('Saved + pushed');
+      else setStatus('Saved local, git push failed');
     }
 
-    document.getElementById('saveBtn').addEventListener('click', save);
-    document.getElementById('addRow').addEventListener('click', () => { model.rows += 1; render(); });
-    document.getElementById('addCol').addEventListener('click', () => { model.cols += 1; render(); });
+    async function syncNow() {
+      setStatus('Syncing...');
+      const r = await fetch('/api/sync', { method: 'POST' });
+      const data = await r.json();
+      if (data.ok) {
+        await loadWorkbook();
+        setStatus('Synced');
+      } else {
+        setStatus('Sync failed');
+      }
+    }
 
-    document.getElementById('exportBtn').addEventListener('click', async () => {
-      window.location.href = '/api/export.csv';
+    document.getElementById('addRow').onclick = () => { activeSheet().rows += 1; render(); };
+    document.getElementById('addCol').onclick = () => { activeSheet().cols += 1; render(); };
+    document.getElementById('saveBtn').onclick = saveWorkbook;
+    document.getElementById('syncBtn').onclick = syncNow;
+
+    document.getElementById('addSheet').onclick = () => {
+      let i = 1;
+      while (wb.sheets[`Sheet${i}`]) i++;
+      const name = `Sheet${i}`;
+      wb.sheets[name] = { rows: 20, cols: 10, cells: {} };
+      wb.sheet_order.push(name);
+      wb.active_sheet = name;
+      selectedAddr = 'A1';
+      render();
+    };
+
+    document.getElementById('renameSheet').onclick = () => {
+      const oldName = wb.active_sheet;
+      const newName = prompt('New sheet name:', oldName);
+      if (!newName || newName === oldName || wb.sheets[newName]) return;
+      wb.sheets[newName] = wb.sheets[oldName];
+      delete wb.sheets[oldName];
+      wb.sheet_order = wb.sheet_order.map(n => n === oldName ? newName : n);
+      wb.active_sheet = newName;
+      render();
+    };
+
+    formulaInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        ensureCell(selectedAddr).raw = formulaInput.value;
+        render();
+      }
     });
+
+    document.getElementById('exportBtn').onclick = () => {
+      window.location.href = `/api/export.csv?sheet=${encodeURIComponent(wb.active_sheet)}`;
+    };
 
     document.getElementById('importFile').addEventListener('change', async (e) => {
       const f = e.target.files[0];
       if (!f) return;
       const form = new FormData();
       form.append('file', f);
+      form.append('sheet', wb.active_sheet);
       setStatus('Importing...');
       const r = await fetch('/api/import.csv', { method: 'POST', body: form });
-      if (!r.ok) { setStatus('Import failed'); return; }
-      model = await r.json();
+      wb = await r.json();
       render();
-      setStatus('Imported');
+      if (wb.git_sync?.ok) setStatus('Imported + pushed');
+      else setStatus('Imported local, git push failed');
     });
 
-    loadSheet();
+    loadWorkbook();
   </script>
 </body>
 </html>

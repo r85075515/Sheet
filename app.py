@@ -27,11 +27,7 @@ def sync_from_repo():
     if os.getenv("SHEET_DISABLE_GIT_SYNC") == "1":
         return {"ok": True, "skipped": True}
     pull = run_git("pull", "--rebase", "origin", "main")
-    return {
-        "ok": pull.returncode == 0,
-        "stdout": pull.stdout.strip(),
-        "stderr": pull.stderr.strip(),
-    }
+    return {"ok": pull.returncode == 0, "stdout": pull.stdout.strip(), "stderr": pull.stderr.strip()}
 
 
 def commit_and_push():
@@ -42,34 +38,63 @@ def commit_and_push():
     if add.returncode != 0:
         return {"ok": False, "step": "add", "stderr": add.stderr.strip()}
 
-    commit = run_git("commit", "-m", "Update sheet cells")
+    commit = run_git("commit", "-m", "Update workbook cells")
     if commit.returncode != 0 and "nothing to commit" not in (commit.stdout + commit.stderr).lower():
-        return {
-            "ok": False,
-            "step": "commit",
-            "stdout": commit.stdout.strip(),
-            "stderr": commit.stderr.strip(),
-        }
+        return {"ok": False, "step": "commit", "stdout": commit.stdout.strip(), "stderr": commit.stderr.strip()}
 
     push = run_git("push", "origin", "main")
+    return {"ok": push.returncode == 0, "step": "push", "stdout": push.stdout.strip(), "stderr": push.stderr.strip()}
+
+
+def default_workbook():
     return {
-        "ok": push.returncode == 0,
-        "step": "push",
-        "stdout": push.stdout.strip(),
-        "stderr": push.stderr.strip(),
+        "version": 2,
+        "sheet_order": ["Sheet1"],
+        "active_sheet": "Sheet1",
+        "sheets": {
+            "Sheet1": {
+                "rows": 20,
+                "cols": 10,
+                "cells": {}
+            }
+        }
     }
 
 
-def load_model():
+def load_workbook():
     if not DATA_PATH.exists():
-        model = {"rows": 20, "cols": 10, "cells": {}}
-        DATA_PATH.write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")
-        return model
-    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+        wb = default_workbook()
+        save_workbook(wb)
+        return wb
+
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+
+    # Backward compatibility for v1 single-sheet format
+    if "sheets" not in data:
+        data = {
+            "version": 2,
+            "sheet_order": ["Sheet1"],
+            "active_sheet": "Sheet1",
+            "sheets": {
+                "Sheet1": {
+                    "rows": int(data.get("rows", 20)),
+                    "cols": int(data.get("cols", 10)),
+                    "cells": data.get("cells", {}),
+                }
+            }
+        }
+
+    if not data.get("sheet_order"):
+        data["sheet_order"] = list(data.get("sheets", {}).keys())
+
+    if not data.get("active_sheet") and data.get("sheet_order"):
+        data["active_sheet"] = data["sheet_order"][0]
+
+    return data
 
 
-def save_model(model):
-    DATA_PATH.write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_workbook(workbook):
+    DATA_PATH.write_text(json.dumps(workbook, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def col_to_index(col: str) -> int:
@@ -173,21 +198,42 @@ def evaluate_cell(addr: str, raw_map: dict, memo: dict, stack: set):
     return raw
 
 
-def current_sheet_model():
-    model = load_model()
-    rows = int(model.get("rows", 20))
-    cols = int(model.get("cols", 10))
-    input_cells = model.get("cells", {})
+def normalize_sheet(sheet):
+    rows = int(sheet.get("rows", 20))
+    cols = int(sheet.get("cols", 10))
+    input_cells = sheet.get("cells", {})
+    normalized = {}
+    for k, v in input_cells.items():
+        raw = str((v or {}).get("raw", ""))
+        if raw != "":
+            normalized[k.upper()] = {"raw": raw}
+    return {"rows": rows, "cols": cols, "cells": normalized}
 
-    raw_map = {k.upper(): str((v or {}).get("raw", "")) for k, v in input_cells.items() if str((v or {}).get("raw", "")) != ""}
 
+def evaluate_sheet(sheet):
+    sheet = normalize_sheet(sheet)
+    raw_map = {k: v["raw"] for k, v in sheet["cells"].items()}
     memo = {}
-    cells = {}
+    out_cells = {}
+
     for addr, raw in raw_map.items():
         val = evaluate_cell(addr, raw_map, memo, set())
-        cells[addr] = {"raw": raw, "value": val}
+        out_cells[addr] = {"raw": raw, "value": val}
 
-    return {"rows": rows, "cols": cols, "cells": cells}
+    return {"rows": sheet["rows"], "cols": sheet["cols"], "cells": out_cells}
+
+
+def workbook_view(workbook):
+    out = {
+        "version": workbook.get("version", 2),
+        "sheet_order": workbook.get("sheet_order", []),
+        "active_sheet": workbook.get("active_sheet"),
+        "sheets": {}
+    }
+    for name in out["sheet_order"]:
+        if name in workbook.get("sheets", {}):
+            out["sheets"][name] = evaluate_sheet(workbook["sheets"][name])
+    return out
 
 
 @app.route("/")
@@ -210,27 +256,36 @@ def sync_now():
 @app.route("/api/sheet", methods=["GET"])
 def get_sheet():
     sync_from_repo()
-    return jsonify(current_sheet_model())
+    wb = load_workbook()
+    return jsonify(workbook_view(wb))
 
 
 @app.route("/api/sheet", methods=["POST"])
 def save_sheet_route():
     data = request.get_json(force=True, silent=False)
-    rows = int(data.get("rows", 20))
-    cols = int(data.get("cols", 10))
-    cells = data.get("cells", {})
 
-    normalized = {}
-    for addr, cell in cells.items():
-        raw = str((cell or {}).get("raw", ""))
-        if raw != "":
-            normalized[addr.upper()] = {"raw": raw}
+    wb = {
+        "version": 2,
+        "sheet_order": data.get("sheet_order", []),
+        "active_sheet": data.get("active_sheet"),
+        "sheets": {}
+    }
 
-    model = {"rows": rows, "cols": cols, "cells": normalized}
-    save_model(model)
+    sheets = data.get("sheets", {})
+    for name in wb["sheet_order"]:
+        if name in sheets:
+            wb["sheets"][name] = normalize_sheet(sheets[name])
 
+    if not wb["sheet_order"]:
+        wb = default_workbook()
+
+    if wb["active_sheet"] not in wb["sheet_order"]:
+        wb["active_sheet"] = wb["sheet_order"][0]
+
+    save_workbook(wb)
     sync_result = commit_and_push()
-    payload = current_sheet_model()
+
+    payload = workbook_view(wb)
     payload["git_sync"] = sync_result
     code = 200 if sync_result.get("ok") else 500
     return jsonify(payload), code
@@ -238,7 +293,12 @@ def save_sheet_route():
 
 @app.route("/api/export.csv", methods=["GET"])
 def export_csv():
-    model = current_sheet_model()
+    wb = load_workbook()
+    sheet_name = request.args.get("sheet") or wb.get("active_sheet")
+    if sheet_name not in wb.get("sheets", {}):
+        return jsonify({"error": "Unknown sheet"}), 400
+
+    model = evaluate_sheet(wb["sheets"][sheet_name])
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -253,19 +313,25 @@ def export_csv():
     return Response(
         output.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=sheet_export.csv"},
+        headers={"Content-Disposition": f"attachment; filename={sheet_name}_export.csv"},
     )
 
 
 @app.route("/api/import.csv", methods=["POST"])
 def import_csv():
+    wb = load_workbook()
+    target_sheet = request.form.get("sheet") or wb.get("active_sheet")
+    if target_sheet not in wb.get("sheets", {}):
+        return jsonify({"error": "Unknown sheet"}), 400
+
     if "file" not in request.files:
         return jsonify({"error": "Missing file"}), 400
+
     f = request.files["file"]
     content = f.read().decode("utf-8", errors="ignore")
     reader = list(csv.reader(io.StringIO(content)))
 
-    rows = len(reader) if reader else 1
+    rows = max(len(reader), 1)
     cols = max((len(r) for r in reader), default=1)
     cells = {}
 
@@ -274,14 +340,16 @@ def import_csv():
             if val != "":
                 cells[make_addr(r_idx, c_idx)] = {"raw": val}
 
-    save_model({"rows": rows, "cols": cols, "cells": cells})
+    wb["sheets"][target_sheet] = {"rows": rows, "cols": cols, "cells": cells}
+    save_workbook(wb)
+
     sync_result = commit_and_push()
-    payload = current_sheet_model()
+    payload = workbook_view(wb)
     payload["git_sync"] = sync_result
     code = 200 if sync_result.get("ok") else 500
     return jsonify(payload), code
 
 
 if __name__ == "__main__":
-    load_model()
+    load_workbook()
     app.run(host="127.0.0.1", port=5000, debug=False)

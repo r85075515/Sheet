@@ -1,15 +1,40 @@
 {
-  "rows": 2,
-  "cols": 2,
-  "cells": {
-    "A1": {
-      "raw": "5"
+  "version": 2,
+  "sheet_order": [
+    "Question Bank",
+    "Coverage Summary"
+  ],
+  "active_sheet": "Question Bank",
+  "sheets": {
+    "Question Bank": {
+      "rows": 3,
+      "cols": 3,
+      "cells": {
+        "A1": {
+          "raw": "Question ID"
+        },
+        "B1": {
+          "raw": "Tool Type"
+        },
+        "C1": {
+          "raw": "=1+2"
+        }
+      }
     },
-    "A2": {
-      "raw": "=A1+B1"
-    },
-    "B1": {
-      "raw": "7"
+    "Coverage Summary": {
+      "rows": 2,
+      "cols": 2,
+      "cells": {
+        "A1": {
+          "raw": "Total"
+        },
+        "A2": {
+          "raw": "60"
+        },
+        "B1": {
+          "raw": "=SUM(A2:A2)"
+        }
+      }
     }
   }
 }

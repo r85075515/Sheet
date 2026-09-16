@@ -5,18 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sheet - Read Only</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
-    .grid-wrap { overflow: auto; border: 1px solid #ddd; max-height: 80vh; }
+    body { margin: 0; background: #f3f2f1; color: #242424; font-family: "Segoe UI", Arial, sans-serif; }
+    .top { background: #fff; border-bottom: 1px solid #d1d1d1; padding: 10px 12px; }
+    .sheet-wrap { margin: 10px; border: 1px solid #d1d1d1; background: #fff; height: calc(100vh - 74px); overflow: auto; }
     table { border-collapse: collapse; width: max-content; min-width: 100%; }
-    th, td { border: 1px solid #ddd; min-width: 100px; height: 28px; padding: 6px; }
-    th { background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
-    td.row-header { background: #f5f5f5; text-align: right; padding-right: 8px; position: sticky; left: 0; z-index: 1; }
-    th.corner { left: 0; z-index: 3; position: sticky; }
+    th, td { border: 1px solid #e6e6e6; min-width: 110px; height: 28px; padding: 4px 8px; box-sizing: border-box; }
+    th { position: sticky; top: 0; background: #faf9f8; z-index: 3; text-align: center; font-size: 12px; }
+    th.corner { left: 0; z-index: 4; min-width: 44px; width: 44px; }
+    td.row-h { position: sticky; left: 0; z-index: 2; min-width: 44px; width: 44px; text-align: right; background: #faf9f8; font-size: 12px; }
   </style>
 </head>
 <body>
-  <h2>Sheet (Read-only)</h2>
-  <div class="grid-wrap"><table id="grid"></table></div>
+  <div class="top"><strong>Sheet (Read-only)</strong> <span id="sheetName"></span></div>
+  <div class="sheet-wrap"><table id="grid"></table></div>
+
   <script>
     function colLabel(idx) {
       let s = '';
@@ -28,10 +30,13 @@
       }
       return s;
     }
-    function addr(r, c) { return `${colLabel(c)}${r+1}`; }
+    function addr(r, c) { return `${colLabel(c)}${r + 1}`; }
 
     async function run() {
-      const model = await (await fetch('/api/sheet')).json();
+      const wb = await (await fetch('/api/sheet')).json();
+      const name = wb.active_sheet || wb.sheet_order[0];
+      document.getElementById('sheetName').textContent = ` - ${name}`;
+      const model = wb.sheets[name];
       const grid = document.getElementById('grid');
 
       const thead = document.createElement('thead');
@@ -50,13 +55,13 @@
       for (let r = 0; r < model.rows; r++) {
         const tr = document.createElement('tr');
         const rh = document.createElement('td');
-        rh.className = 'row-header';
-        rh.textContent = String(r+1);
+        rh.className = 'row-h';
+        rh.textContent = String(r + 1);
         tr.appendChild(rh);
+
         for (let c = 0; c < model.cols; c++) {
           const td = document.createElement('td');
-          const cell = model.cells[addr(r,c)] || { value: '' };
-          td.textContent = cell.value ?? '';
+          td.textContent = (model.cells[addr(r, c)]?.value ?? '');
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -65,6 +70,7 @@
       grid.appendChild(thead);
       grid.appendChild(tbody);
     }
+
     run();
   </script>
 </body>
