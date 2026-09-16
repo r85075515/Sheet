@@ -8,172 +8,409 @@
     :root {
       --bg: #f3f2f1;
       --panel: #ffffff;
-      --border: #d1d1d1;
-      --text: #242424;
-      --muted: #616161;
+      --line: #e1dfdd;
+      --line-strong: #c8c6c4;
+      --text: #323130;
+      --muted: #605e5c;
       --accent: #0f6cbd;
-      --accent-weak: #deecf9;
+      --accent-soft: #deecf9;
+      --header: #faf9f8;
+      --cell-h: 28px;
+      --col-w: 110px;
     }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", Arial, sans-serif; }
-    .topbar {
-      height: 44px;
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 13px;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: 36px 38px 66px 38px 1fr 36px 26px;
+      height: 100vh;
+    }
+
+    /* Window/title bar */
+    .titlebar {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+    }
+    .title-left {
       display: flex;
       align-items: center;
-      padding: 0 12px;
-      background: #ffffff;
-      border-bottom: 1px solid var(--border);
-      gap: 14px;
-      font-size: 13px;
+      gap: 10px;
+      min-width: 0;
     }
-    .brand { font-weight: 600; }
-    .menu { display: flex; gap: 10px; color: var(--muted); }
-    .menu span { cursor: default; }
-    .toolbar {
+    .excel-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: #107c41;
+      display: inline-block;
+    }
+    .book-title {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 460px;
+    }
+    .search-wrap {
+      display: flex;
+      justify-content: center;
+      min-width: 0;
+    }
+    .search {
+      width: min(560px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      height: 28px;
+      padding: 0 10px;
+      color: var(--muted);
+      background: #fff;
+      display: flex;
+      align-items: center;
+    }
+    .title-right {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
-      background: #fff;
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
     }
-    button, input[type="file"] {
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--text);
+    .chip {
+      border: 1px solid var(--line);
+      padding: 4px 8px;
       border-radius: 4px;
-      padding: 6px 10px;
+      background: #fff;
       font-size: 12px;
     }
-    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    #status { margin-left: 8px; color: var(--muted); font-size: 12px; }
-    .formula-bar {
-      display: grid;
-      grid-template-columns: 80px 1fr;
-      gap: 8px;
-      padding: 8px 12px;
+    .share-btn {
+      background: #107c41;
+      color: #fff;
+      border: 1px solid #107c41;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-weight: 600;
+    }
+
+    /* Ribbon tabs */
+    .tabs-row {
       background: #fff;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: end;
+      padding: 0 10px;
+      gap: 2px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .rtab {
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .rtab.active {
+      color: var(--text);
+      background: #fff;
+      border-color: var(--line);
+      font-weight: 600;
+    }
+
+    /* Ribbon content */
+    .ribbon {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      padding: 6px 10px;
+      overflow-x: auto;
+    }
+    .group {
+      border-right: 1px solid var(--line);
+      padding-right: 10px;
+      min-width: max-content;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 4px;
+    }
+    .group:last-child { border-right: none; }
+    .group-body {
+      display: flex;
       align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-height: 40px;
+    }
+    .group-label {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      user-select: none;
+    }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .btn.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Formula bar */
+    .formula-row {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 84px 26px 1fr;
+      gap: 6px;
+      align-items: center;
+      padding: 5px 10px;
     }
     #nameBox, #formulaInput {
-      height: 30px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
       padding: 0 8px;
       font-size: 13px;
-      box-sizing: border-box;
       background: #fff;
+      color: var(--text);
     }
-    #nameBox { width: 100%; }
-    .sheet-wrap {
-      margin: 10px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      height: calc(100vh - 180px);
-      overflow: auto;
-    }
-    table { border-collapse: collapse; width: max-content; min-width: 100%; }
-    th, td {
-      border: 1px solid #e6e6e6;
-      min-width: 110px;
+    .fx {
       height: 28px;
-      box-sizing: border-box;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8a8886;
+      background: #fff;
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    /* Grid */
+    .sheet-area {
+      margin: 0;
+      background: var(--panel);
+      overflow: auto;
+      border-bottom: 1px solid var(--line);
+    }
+    table {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #eceae8;
+      height: var(--cell-h);
+      min-width: var(--col-w);
+      max-width: var(--col-w);
+      width: var(--col-w);
+      padding: 0;
+      background: #fff;
+      vertical-align: middle;
     }
     th {
+      background: var(--header);
       position: sticky;
       top: 0;
-      background: #faf9f8;
-      z-index: 3;
+      z-index: 4;
       text-align: center;
       font-size: 12px;
       color: #3b3a39;
       font-weight: 600;
     }
     th.corner {
-      left: 0;
-      z-index: 4;
       min-width: 44px;
+      max-width: 44px;
       width: 44px;
+      left: 0;
+      z-index: 5;
     }
     td.row-h {
+      min-width: 44px;
+      max-width: 44px;
+      width: 44px;
       position: sticky;
       left: 0;
-      z-index: 2;
-      min-width: 44px;
-      width: 44px;
+      z-index: 3;
+      background: var(--header);
       text-align: right;
-      padding-right: 8px;
-      background: #faf9f8;
       color: #3b3a39;
+      padding-right: 8px;
       font-size: 12px;
       user-select: none;
     }
-    td.cell { padding: 0; background: #fff; }
     td.cell input {
       width: 100%;
       height: 100%;
       border: none;
+      outline: none;
       padding: 0 8px;
-      box-sizing: border-box;
       font-size: 13px;
+      color: var(--text);
       background: transparent;
     }
     td.cell input:focus {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
-      background: var(--accent-weak);
+      background: #fff;
     }
-    .tabs {
+
+    /* Sheet tabs */
+    .tabs-strip {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
       display: flex;
+      align-items: center;
       gap: 6px;
-      padding: 8px 10px;
-      background: #fff;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      padding: 5px 8px;
+      overflow-x: auto;
+      white-space: nowrap;
     }
-    .tab {
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
+    .sheet-tab {
+      border: 1px solid var(--line);
       background: #f8f8f8;
+      border-radius: 4px;
+      padding: 5px 12px;
+      font-size: 12px;
       cursor: pointer;
+      user-select: none;
     }
-    .tab.active {
+    .sheet-tab.active {
       background: #fff;
-      border-color: var(--accent);
       color: var(--accent);
+      border-color: var(--accent);
       font-weight: 600;
     }
+
+    /* Status bar */
+    .status {
+      background: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding: 0 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status-right { display: flex; gap: 10px; align-items: center; }
+
+    .tiny {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 3px 7px;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    a.inline-link { color: var(--accent); text-decoration: none; }
+    a.inline-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="brand">Sheet</div>
-    <div class="menu"><span>File</span><span>Home</span><span>Insert</span><span>Data</span><span>Review</span><span>View</span></div>
-  </div>
+  <div class="app">
+    <div class="titlebar">
+      <div class="title-left">
+        <span class="excel-dot"></span>
+        <div class="book-title">Sheet - Workbook</div>
+      </div>
+      <div class="search-wrap"><div class="search">Search for tools, help, and more</div></div>
+      <div class="title-right">
+        <div class="chip">Comments</div>
+        <button class="share-btn">Share</button>
+      </div>
+    </div>
 
-  <div class="toolbar">
-    <button id="addRow">+ Row</button>
-    <button id="addCol">+ Col</button>
-    <button id="addSheet">+ Sheet</button>
-    <button id="renameSheet">Rename Sheet</button>
-    <button id="syncBtn">Sync</button>
-    <button class="primary" id="saveBtn">Save</button>
-    <button id="exportBtn">Export CSV</button>
-    <label>Import CSV <input id="importFile" type="file" accept=".csv" /></label>
-    <a href="/view" target="_blank">Read-only view</a>
-    <span id="status">Ready</span>
-  </div>
+    <div class="tabs-row">
+      <div class="rtab">File</div>
+      <div class="rtab active">Home</div>
+      <div class="rtab">Insert</div>
+      <div class="rtab">Page Layout</div>
+      <div class="rtab">Formulas</div>
+      <div class="rtab">Data</div>
+      <div class="rtab">Review</div>
+      <div class="rtab">View</div>
+      <div class="rtab">Help</div>
+    </div>
 
-  <div class="formula-bar">
-    <input id="nameBox" readonly value="A1" />
-    <input id="formulaInput" placeholder="Formula bar (edit selected cell and press Enter)" />
-  </div>
+    <div class="ribbon">
+      <div class="group">
+        <div class="group-body">
+          <button class="btn" id="syncBtn">Sync</button>
+          <button class="btn primary" id="saveBtn">Save</button>
+          <a class="inline-link" href="/view" target="_blank">Read-only view</a>
+        </div>
+        <div class="group-label">Workbook</div>
+      </div>
 
-  <div class="sheet-wrap"><table id="grid"></table></div>
-  <div class="tabs" id="tabs"></div>
+      <div class="group">
+        <div class="group-body">
+          <button class="btn" id="addRow">Insert Row</button>
+          <button class="btn" id="addCol">Insert Column</button>
+          <button class="btn" id="addSheet">New Sheet</button>
+          <button class="btn" id="renameSheet">Rename Sheet</button>
+        </div>
+        <div class="group-label">Cells</div>
+      </div>
+
+      <div class="group">
+        <div class="group-body">
+          <button class="btn" id="exportBtn">Export CSV</button>
+          <label class="btn">Import CSV <input id="importFile" type="file" accept=".csv" style="display:none"></label>
+        </div>
+        <div class="group-label">Data</div>
+      </div>
+
+      <div class="group">
+        <div class="group-body">
+          <span class="tiny" id="status">Ready</span>
+        </div>
+        <div class="group-label">Status</div>
+      </div>
+    </div>
+
+    <div class="formula-row">
+      <input id="nameBox" readonly value="A1" />
+      <div class="fx">fx</div>
+      <input id="formulaInput" placeholder="Formula bar (press Enter to apply)" />
+    </div>
+
+    <div class="sheet-area"><table id="grid"></table></div>
+
+    <div class="tabs-strip" id="tabs"></div>
+
+    <div class="status">
+      <div>Workbook Statistics</div>
+      <div class="status-right">
+        <span>100%</span>
+      </div>
+    </div>
+  </div>
 
   <script>
     let wb = { version: 2, sheet_order: ['Sheet1'], active_sheet: 'Sheet1', sheets: { Sheet1: { rows: 20, cols: 10, cells: {} } } };
@@ -199,10 +436,7 @@
     }
 
     function addr(r, c) { return `${colLabel(c)}${r + 1}`; }
-
-    function activeSheet() {
-      return wb.sheets[wb.active_sheet];
-    }
+    function activeSheet() { return wb.sheets[wb.active_sheet]; }
 
     function ensureCell(a) {
       const s = activeSheet();
@@ -212,9 +446,10 @@
 
     function renderTabs() {
       tabs.innerHTML = '';
+
       wb.sheet_order.forEach(name => {
         const t = document.createElement('div');
-        t.className = 'tab' + (name === wb.active_sheet ? ' active' : '');
+        t.className = 'sheet-tab' + (name === wb.active_sheet ? ' active' : '');
         t.textContent = name;
         t.onclick = () => {
           wb.active_sheet = name;
@@ -223,6 +458,13 @@
         };
         tabs.appendChild(t);
       });
+
+      const add = document.createElement('div');
+      add.className = 'sheet-tab';
+      add.textContent = '+';
+      add.title = 'Add sheet';
+      add.onclick = () => document.getElementById('addSheet').click();
+      tabs.appendChild(add);
     }
 
     function renderGrid() {
@@ -232,6 +474,7 @@
       const corner = document.createElement('th');
       corner.className = 'corner';
       hr.appendChild(corner);
+
       for (let c = 0; c < s.cols; c++) {
         const th = document.createElement('th');
         th.textContent = colLabel(c);
@@ -255,7 +498,7 @@
           const cell = s.cells[a] || { raw: '', value: '' };
           input.value = cell.raw;
           input.dataset.addr = a;
-          input.title = (cell.value ?? '').toString();
+          input.title = String(cell.value ?? '');
           input.onfocus = () => selectCell(a);
           input.onchange = (e) => {
             ensureCell(a).raw = e.target.value;
@@ -264,6 +507,7 @@
           td.appendChild(input);
           tr.appendChild(td);
         }
+
         tbody.appendChild(tr);
       }
 
@@ -369,6 +613,7 @@
       render();
       if (wb.git_sync?.ok) setStatus('Imported + pushed');
       else setStatus('Imported local, git push failed');
+      e.target.value = '';
     });
 
     loadWorkbook();
