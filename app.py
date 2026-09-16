@@ -1,45 +1,75 @@
 import csv
 import io
+import json
+import os
 import re
-import sqlite3
+import subprocess
 from pathlib import Path
 from flask import Flask, jsonify, render_template, request, Response
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "sheet.db"
+DATA_PATH = BASE_DIR / "sheet_data.json"
 
 app = Flask(__name__)
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def run_git(*args):
+    return subprocess.run(
+        ["git", *args],
+        cwd=BASE_DIR,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
 
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sheet_meta (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            rows INTEGER NOT NULL,
-            cols INTEGER NOT NULL
-        )
-        """
-    )
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS cells (
-            addr TEXT PRIMARY KEY,
-            raw TEXT NOT NULL DEFAULT ''
-        )
-        """
-    )
-    cur.execute("INSERT OR IGNORE INTO sheet_meta (id, rows, cols) VALUES (1, 20, 10)")
-    conn.commit()
-    conn.close()
+def sync_from_repo():
+    if os.getenv("SHEET_DISABLE_GIT_SYNC") == "1":
+        return {"ok": True, "skipped": True}
+    pull = run_git("pull", "--rebase", "origin", "main")
+    return {
+        "ok": pull.returncode == 0,
+        "stdout": pull.stdout.strip(),
+        "stderr": pull.stderr.strip(),
+    }
+
+
+def commit_and_push():
+    if os.getenv("SHEET_DISABLE_GIT_SYNC") == "1":
+        return {"ok": True, "skipped": True}
+
+    add = run_git("add", "sheet_data.json")
+    if add.returncode != 0:
+        return {"ok": False, "step": "add", "stderr": add.stderr.strip()}
+
+    commit = run_git("commit", "-m", "Update sheet cells")
+    if commit.returncode != 0 and "nothing to commit" not in (commit.stdout + commit.stderr).lower():
+        return {
+            "ok": False,
+            "step": "commit",
+            "stdout": commit.stdout.strip(),
+            "stderr": commit.stderr.strip(),
+        }
+
+    push = run_git("push", "origin", "main")
+    return {
+        "ok": push.returncode == 0,
+        "step": "push",
+        "stdout": push.stdout.strip(),
+        "stderr": push.stderr.strip(),
+    }
+
+
+def load_model():
+    if not DATA_PATH.exists():
+        model = {"rows": 20, "cols": 10, "cells": {}}
+        DATA_PATH.write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")
+        return model
+    return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+
+
+def save_model(model):
+    DATA_PATH.write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def col_to_index(col: str) -> int:
@@ -108,7 +138,6 @@ def eval_formula(expr: str, raw_map: dict, memo: dict, stack: set):
         memo[addr] = v
         return v
 
-    # SUM(A1:B2)
     sum_match = re.fullmatch(r"SUM\(([A-Z]+[0-9]+):([A-Z]+[0-9]+)\)", text, flags=re.IGNORECASE)
     if sum_match:
         total = 0.0
@@ -119,7 +148,6 @@ def eval_formula(expr: str, raw_map: dict, memo: dict, stack: set):
             total += as_number(v)
         return total
 
-    # Replace cell references for arithmetic
     def repl(m):
         a = m.group(0).upper()
         v = value_of(a)
@@ -146,14 +174,13 @@ def evaluate_cell(addr: str, raw_map: dict, memo: dict, stack: set):
 
 
 def current_sheet_model():
-    conn = get_db()
-    meta = conn.execute("SELECT rows, cols FROM sheet_meta WHERE id = 1").fetchone()
-    rows = meta["rows"]
-    cols = meta["cols"]
-    raw_rows = conn.execute("SELECT addr, raw FROM cells").fetchall()
-    conn.close()
+    model = load_model()
+    rows = int(model.get("rows", 20))
+    cols = int(model.get("cols", 10))
+    input_cells = model.get("cells", {})
 
-    raw_map = {r["addr"]: r["raw"] for r in raw_rows}
+    raw_map = {k.upper(): str((v or {}).get("raw", "")) for k, v in input_cells.items() if str((v or {}).get("raw", "")) != ""}
+
     memo = {}
     cells = {}
     for addr, raw in raw_map.items():
@@ -173,31 +200,40 @@ def view_only():
     return render_template("view.html")
 
 
+@app.route("/api/sync", methods=["POST"])
+def sync_now():
+    result = sync_from_repo()
+    code = 200 if result.get("ok") else 500
+    return jsonify(result), code
+
+
 @app.route("/api/sheet", methods=["GET"])
 def get_sheet():
+    sync_from_repo()
     return jsonify(current_sheet_model())
 
 
 @app.route("/api/sheet", methods=["POST"])
-def save_sheet():
+def save_sheet_route():
     data = request.get_json(force=True, silent=False)
     rows = int(data.get("rows", 20))
     cols = int(data.get("cols", 10))
     cells = data.get("cells", {})
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE sheet_meta SET rows = ?, cols = ? WHERE id = 1", (rows, cols))
-    cur.execute("DELETE FROM cells")
-
+    normalized = {}
     for addr, cell in cells.items():
         raw = str((cell or {}).get("raw", ""))
         if raw != "":
-            cur.execute("INSERT OR REPLACE INTO cells (addr, raw) VALUES (?, ?)", (addr.upper(), raw))
+            normalized[addr.upper()] = {"raw": raw}
 
-    conn.commit()
-    conn.close()
-    return jsonify(current_sheet_model())
+    model = {"rows": rows, "cols": cols, "cells": normalized}
+    save_model(model)
+
+    sync_result = commit_and_push()
+    payload = current_sheet_model()
+    payload["git_sync"] = sync_result
+    code = 200 if sync_result.get("ok") else 500
+    return jsonify(payload), code
 
 
 @app.route("/api/export.csv", methods=["GET"])
@@ -229,27 +265,23 @@ def import_csv():
     content = f.read().decode("utf-8", errors="ignore")
     reader = list(csv.reader(io.StringIO(content)))
 
-    rows = len(reader) if reader else 0
-    cols = max((len(r) for r in reader), default=0)
+    rows = len(reader) if reader else 1
+    cols = max((len(r) for r in reader), default=1)
     cells = {}
 
     for r_idx, row in enumerate(reader):
-      for c_idx, val in enumerate(row):
+        for c_idx, val in enumerate(row):
             if val != "":
                 cells[make_addr(r_idx, c_idx)] = {"raw": val}
 
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE sheet_meta SET rows = ?, cols = ? WHERE id = 1", (max(rows, 1), max(cols, 1)))
-    cur.execute("DELETE FROM cells")
-    for addr, cell in cells.items():
-        cur.execute("INSERT OR REPLACE INTO cells (addr, raw) VALUES (?, ?)", (addr, cell["raw"]))
-    conn.commit()
-    conn.close()
-
-    return jsonify(current_sheet_model())
+    save_model({"rows": rows, "cols": cols, "cells": cells})
+    sync_result = commit_and_push()
+    payload = current_sheet_model()
+    payload["git_sync"] = sync_result
+    code = 200 if sync_result.get("ok") else 500
+    return jsonify(payload), code
 
 
 if __name__ == "__main__":
-    init_db()
+    load_model()
     app.run(host="127.0.0.1", port=5000, debug=False)
